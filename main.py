@@ -42,9 +42,9 @@ if __name__ == '__main__':
         if command.startswith(Play().command_text):
             Play().decode(command).execute()
 
-        if command.startswith(AddSong().command_text):
-            id = AddSong().decode(command).execute()
-            print(f'Added song with id = {id}')
+        if command.startswith(DeleteSong().command_text):
+            DeleteSong().decode(command).execute()
+            print(f'Deleted Song')
     except ValueError as FormatInvalid:
         print(FormatInvalid)
 
