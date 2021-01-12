@@ -38,8 +38,7 @@ class DatabaseManager(object):
         cursor: mysql.connector.connection.MySQLCursor = self.__conn.cursor(prepared=params is not None)
         cursor.execute(statement, params)
 
-        if statement.lower().startswith('select') or statement.lower().startswith('update') or \
-                statement.lower().startswith('delete') or statement.lower().startswith('insert'):
+        if statement.lower().startswith('select'):
             result_set: [] = cursor.fetchall()
         else:
             result_set = []
@@ -119,7 +118,7 @@ class DatabaseManager(object):
             return rows[0][0]
 
         DatabaseManager.execute_prepared('INSERT INTO artist (name) VALUES (%s)', (artist_name, ))
-        DatabaseManager.get_artist_id(artist_name)
+        return DatabaseManager.get_artist_id(artist_name)
 
     @staticmethod
     def get_album_id(album_name: str):
@@ -128,4 +127,4 @@ class DatabaseManager(object):
             return rows[0][0]
 
         DatabaseManager.execute_prepared('INSERT INTO album (name) VALUES (%s)', (album_name, ))
-        DatabaseManager.get_album_id(album_name)
+        return DatabaseManager.get_album_id(album_name)

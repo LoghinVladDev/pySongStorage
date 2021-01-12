@@ -6,7 +6,7 @@ create table artist (
 create table album (
     id int primary key auto_increment,
     name varchar(128) unique not null,
-    release_date date
+    release_year int
 );
 
 create table song (
@@ -14,10 +14,10 @@ create table song (
     file_name varchar(128) unique not null,
 
     song_name varchar(128) not null ,
-    artist_id int not null,
+    artist_id int,
     album_id int,
 
-    release_date date,
+    release_year int,
 
     duration_sec int,
 

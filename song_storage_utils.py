@@ -1,9 +1,20 @@
 import shutil
 from db.database_manager import DatabaseManager
 
+
 def to_s(seconds_value: str):
+    if seconds_value.isnumeric():
+        return int(seconds_value)
 
+    if 'm' in seconds_value:
+        minutes = seconds_value.split('m')[0]
+        seconds = seconds_value.split('m')[1]
 
+        if 's' in seconds:
+            seconds = int(seconds[:seconds.find('s')])
+
+        return int(minutes) * 60 + int(seconds)
+    raise ValueError('Invalid Format of Time')
 
 class Command(object):
     __parameters: [tuple] = []
@@ -122,15 +133,17 @@ class AddSong(Command):
                 values += ', %s'
                 prep_values.append(DatabaseManager.get_album_id(p[2]))
             if p[0] == '--release-year':
-                query += ', release_date'
-                values += '%s'
+                query += ', release_year'
+                values += ', %s'
                 prep_values.append(p[2])
             if p[0] == '--duration':
                 query += ', duration_sec'
-                values += '%s'
+                values += ', %s'
                 prep_values.append(to_s(p[2]))
 
         query += ') VALUES ' + values + ')'
+        print(query)
+        print(prep_values)
         DatabaseManager.execute_prepared(query, tuple(prep_values))
 
     @property
@@ -319,8 +332,8 @@ if __name__ == '__main__':
     # print(Play().usage)
 
     try:
-        AddSong().decode(
+        print(AddSong().decode(
             'Add_song ./temp/Rust_In_Peace_Polaris.mp3 --title = Rust In Peace Polaris --album = Rust In Peace --release-year = 1990'
-            ' --tag = codec flac').execute()
+            ' --tag = codec flac').execute())
     except ValueError as e:
         print(e)
