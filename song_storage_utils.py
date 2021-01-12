@@ -1,6 +1,7 @@
 import shutil
 from db.database_manager import DatabaseManager
 import os
+import zipfile
 
 
 def to_s(seconds_value: str):
@@ -486,6 +487,27 @@ class CreateSaveList(Command):
         ('--tag', '[=] searches by tag value', None, None),
     ]
 
+    def __init__(self):
+        Command.__init__(self)
+        self.__entries = []
+
+    def execute(self):
+        os.mkdir('./.zip')
+        paths = ['./storage/' + entry['File Name'] for entry in self.__entries]
+
+        for path in paths:
+            shutil.copy2(path, './.zip')
+
+        shutil.make_archive('Savelist', 'zip', './.zip')
+
+        for entry in self.__entries:
+            os.remove('./.zip/' + entry['File Name'])
+        os.rmdir('./.zip')
+
+    def decode(self, string: str):
+        self.__entries = Search().decode(Search().command_text + string.removeprefix(self.command_text)).execute()
+        return self
+
     @property
     def command_text(self):
         return 'Create_save_list'
@@ -555,5 +577,7 @@ if __name__ == '__main__':
                                   '--release-year = 1990 --duration = 5m 30s --atag = channels:stereo').execute())
 
         print(Search().decode('Search ').execute())
+
+        print(CreateSaveList().decode('Create_save_list --album = Rust in Peace').execute())
     except ValueError as e:
         print(e)
