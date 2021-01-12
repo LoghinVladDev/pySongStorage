@@ -80,6 +80,9 @@ class DatabaseManager(object):
                 if force_clear:
                     for p in range(pass_cnt):
                         for s in statements:
+                            if not s.strip().lower().startswith('create table'):
+                                continue
+
                             table_name: str = s[s.find('table ') + len('table '):s.find('(') - 1]
 
                             if table_name.lower() in tables:
@@ -90,6 +93,10 @@ class DatabaseManager(object):
                                     pass
 
                 for s in statements:
+                    if not s.strip().lower().startswith('create table'):
+                        DatabaseManager.execute(s)
+                        continue
+
                     table_name: str = s[s.find('table ') + len('table '):s.find('(') - 1]
 
                     if table_name.lower() not in tables:
