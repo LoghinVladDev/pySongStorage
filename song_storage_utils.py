@@ -1,5 +1,6 @@
 import shutil
 from db.database_manager import DatabaseManager
+import re
 
 
 def to_s(seconds_value: str):
@@ -270,43 +271,57 @@ class Search(Command):
         ('--title', '[=] searches by title', None),
         ('--artist', '[=] searches by artist', None),
         ('--album', '[=] searches by album', None),
-        ('--release-year', '[=, >, <, >=, <=] searches by release year', None),
-        ('--duration', '[=, >, <, >=, <=] searches by duration', None),
+        ('--release-year', '[=] searches by release year', None),
         ('--tag', '[=] searches by tag value', None, None),
     ]
 
-    def decode(self, string: str):
-        parts = string.split(' ', 2)
+    def execute(self):
+        rows = DatabaseManager.execute(
+            'SELECT song.id, file_name, song_name, artist_id, album_id, song.release_year,'
+            'duration_sec FROM song')
 
-        if len(parts) < 3:
+        for p in self.__modified_params:
+            if p[0] == '--artist':
+                artist_id = DatabaseManager.get_artist_id(p[2])
+                rows = list(filter(lambda x: x[3] == artist_id, rows))
+
+
+
+        for row in rows:
+            print(row)
+
+        return None
+
+    def __init__(self):
+        Command.__init__(self)
+        self.__modified_params = None
+
+    def decode(self, string: str):
+        parts = string.split(' ', 1)
+
+        if len(parts) < 1:
             raise ValueError(f'{self.command_text} : not enough parameters')
 
         if parts[0] != self.command_text:
             raise ValueError(f'{self.command_text} : command name invalid')
 
-        try:
-            open(parts[1], 'rb').close()
-            self.__file_path = parts[1]
-        except IOError:
-            raise ValueError(f'{self.command_text} : file path invalid')
+        if len(parts) > 1:
+            args = parts[1].split("--")
+            self.__modified_params = []
+            for arg in args:
+                if not arg:
+                    continue
 
-        self.set_file_name(parts[1].strip().split('/')[-1])
+                arg_label_value = arg.split('=')
+                # arg_label_value = re.split(r'=|>|<|>=|<=', arg)
+                label = arg_label_value[0].strip()
+                value = arg_label_value[1].strip()
 
-        args = parts[2].split("--")
-        self.__modified_params = []
-        for arg in args:
-            if not arg:
-                continue
-
-            arg_label_value = arg.split('=')
-            label = arg_label_value[0].strip()
-            value = arg_label_value[1].strip()
-
-            for p in self.__parameters:
-                if p[0].endswith(label):
-                    self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
-                                                  else (p[0], p[1], value.split(':')[0].strip(),
-                                                        value.split(':')[1].strip()))
+                for p in self.__parameters:
+                    if p[0].endswith(label):
+                        self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
+                                                      else (p[0], p[1], value.split(':')[0].strip(),
+                                                            value.split(':')[1].strip()))
 
         return self
 
@@ -326,6 +341,12 @@ class Search(Command):
             param_string += f'\t\t{p[0]} - {p[1]}\n'
 
         return param_string
+
+    def debug(self):
+        Command.debug(self)
+        print('Search : ')
+        for p in self.__modified_params:
+            print(f'\t{p[0]} : {p[2]}, {p[3] if p[0] == "--tag" else ""}')
 
 
 class CreateSaveList(Command):
@@ -379,9 +400,11 @@ if __name__ == '__main__':
         print(AddSong().decode(
             'Add_song ./temp/Rust_In_Peace_Polaris.mp3 --title = Rust In Peace Polaris --album = Rust In Peace '
             '--release-year = 1990 '
+            '--artist = Megadeth '
             ' --tag = codec:mp3 --tag = sample rate:44100Hz').execute())
         print(AddSong().decode(
             'Add_song ./temp/02-megadeth-dystopia.flac --title = Dystopia --album = Dystopia '
+            '--artist = Megadeth '
             '--release-year = 2016 '
             ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
         print(AddSong().decode(
@@ -391,7 +414,9 @@ if __name__ == '__main__':
         print(AddSong().decode(
             'Add_song ./temp/01-megadeth-the_threat_is_real.flac --title = The Threat is Real --album = Dystopia '
             '--release-year = 2016 '
+            '--artist = Megadeth '
             ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
+
+        print(Search().decode('Search --artist = Megadeth --album = Dystopia --tag = codec:flac').execute())
     except ValueError as e:
         print(e)
-
