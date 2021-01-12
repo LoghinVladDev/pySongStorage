@@ -187,6 +187,9 @@ class AddSong(Command):
             if not arg:
                 continue
 
+            if '=' not in arg:
+                raise ValueError(f'{self.command_text} : format invalid. Attribute must have = between label and value')
+
             arg_label_value = arg.split('=')
             label = arg_label_value[0].strip()
             value = arg_label_value[1].strip()
@@ -284,7 +287,21 @@ class Search(Command):
             if p[0] == '--artist':
                 artist_id = DatabaseManager.get_artist_id(p[2])
                 rows = list(filter(lambda x: x[3] == artist_id, rows))
+            if p[0] == '--album':
+                album_id = DatabaseManager.get_album_id(p[2])
+                rows = list(filter(lambda x: x[4] == album_id, rows))
+            if p[0] == '--title':
+                rows = list(filter(lambda x: x[2] == p[2], rows))
+            if p[0] == '--release-year':
+                rows = list(filter(lambda x: x[5] == int(p[2]), rows))
 
+        for p in self.__modified_params:
+            if p[0] == '--tag':
+                tag_id = DatabaseManager.get_tag_id(p[2])
+                tag_rows = list(filter(lambda x: x[2] == p[3], DatabaseManager.execute_prepared(
+                    'SELECT song_id, tag_id, value FROM song_tag WHERE tag_id = %s', (tag_id, ))))
+
+                rows = list(filter(lambda x: x[0] in [song_id[0] for song_id in tag_rows], rows))
 
 
         for row in rows:
@@ -311,6 +328,10 @@ class Search(Command):
             for arg in args:
                 if not arg:
                     continue
+
+                if '=' not in arg:
+                    raise ValueError(
+                        f'{self.command_text} : format invalid. Attribute must have = between label and value')
 
                 arg_label_value = arg.split('=')
                 # arg_label_value = re.split(r'=|>|<|>=|<=', arg)
@@ -417,6 +438,6 @@ if __name__ == '__main__':
             '--artist = Megadeth '
             ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
 
-        print(Search().decode('Search --artist = Megadeth --album = Dystopia --tag = codec:flac').execute())
+        print(Search().decode('Search --tag = codec:flac').execute())
     except ValueError as e:
         print(e)
