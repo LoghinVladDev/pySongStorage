@@ -57,7 +57,7 @@ class DatabaseManager(object):
         return conn.execute_statement(statement, params)
 
     @staticmethod
-    def init_database(script_path: str = 'db/init_script.sql'):
+    def init_database(script_path: str = 'db/init_script.sql', force_clear: bool = False, pass_cnt: int = 3):
         try:
             with open(script_path, 'r') as script_file:
                 remainder: str = ''
@@ -76,6 +76,18 @@ class DatabaseManager(object):
 
                 tables = [entry[0].lower() for entry in DatabaseManager.execute('SELECT table_name FROM '
                                                                                 'information_schema.tables')]
+
+                if force_clear:
+                    for p in range(pass_cnt):
+                        for s in statements:
+                            table_name: str = s[s.find('table ') + len('table '):s.find('(') - 1]
+
+                            if table_name.lower() in tables:
+                                try:
+                                    DatabaseManager.execute(f'DROP TABLE {table_name}')
+                                    tables.remove(table_name.lower())
+                                except Exception as Ignored:
+                                    pass
 
                 for s in statements:
                     table_name: str = s[s.find('table ') + len('table '):s.find('(') - 1]
