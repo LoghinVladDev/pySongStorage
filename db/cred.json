@@ -1,0 +1,6 @@
+{
+  "host" : "localhost",
+  "user" : "song-storage-app",
+  "pass" : "test-pass-sstoreapp",
+  "db" : "song_storage"
+}
