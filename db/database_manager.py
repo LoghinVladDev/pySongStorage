@@ -137,3 +137,20 @@ class DatabaseManager(object):
 
         DatabaseManager.execute_prepared('INSERT INTO tag(name) VALUES (%s)', (tag_name,))
         return DatabaseManager.get_tag_id(tag_name)
+
+    @staticmethod
+    def get_artist_by_id(artist_id):
+        rows = DatabaseManager.execute_prepared('SELECT name FROM artist WHERE id=%s', (artist_id, ))
+        return rows[0][0] if rows else "Unknown"
+
+    @staticmethod
+    def get_album_by_id(album_id):
+        rows = DatabaseManager.execute_prepared('SELECT name FROM album WHERE id=%s', (album_id, ))
+        return rows[0][0] if rows else "Unknown"
+
+    @staticmethod
+    def get_tags_for_song_id(song_id):
+        rows = DatabaseManager.execute_prepared('SELECT name, value FROM song_tag JOIN '
+                                                'tag on tag.id = song_tag.tag_id WHERE song_id = %s', (song_id, ))
+
+        return [{row[0]: row[1]} for row in rows]

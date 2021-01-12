@@ -265,7 +265,9 @@ class ModifySong(Command):
         ('--album', 'sets the album metadata value to the value given', None),
         ('--release-year', 'sets the release year metadata value to the value given', None),
         ('--duration', 'sets the duration metadata value to the value given', None),
-        ('--tag', 'adds a tag for the song', None, None)
+        ('--atag', 'adds a tag for the song', None, None),
+        ('--rtag', 'adds a tag for the song', None, None),
+        ('--mtag', 'adds a tag for the song', None, None),
     ]
 
     def __init__(self):
@@ -302,56 +304,56 @@ class ModifySong(Command):
 
             for p in self.__parameters:
                 if p[0].endswith(label):
-                    self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
+                    self.__modified_params.append((p[0], p[1], value) if not p[0].endswith('tag')
                                                   else (p[0], p[1], value.split(':')[0].strip(),
                                                         value.split(':')[1].strip()))
 
         return self
 
-    def execute(self):
-        rows = DatabaseManager.execute_prepared('SELECT ID FROM song WHERE file_name = %s', (self.file_name,))
+    def execute(self) -> None:
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM song WHERE id = %s', (self.__id,))
 
-        if rows:
-            return rows[0][0]
+        if not rows:
+            raise ValueError(f'{self.command_text} : ID not valid')
 
-        shutil.copy2(self.__file_path, './storage')
-        query = 'INSERT INTO song (file_name'
-        values = '(%s'
-        prep_values = [self.file_name]
+        query = 'UPDATE song set '
+        values = '('
+        prep_values = []
 
         for p in self.__modified_params:
             if p[0] == '--title':
-                query += ', song_name'
-                values += ', %s'
+                query += 'song_name = %s, '
                 prep_values.append(p[2])
             if p[0] == '--artist':
-                query += ', artist_id'
-                values += ', %s'
+                query += 'artist_id = %s, '
                 prep_values.append(DatabaseManager.get_artist_id(p[2]))
             if p[0] == '--album':
-                query += ', album_id'
-                values += ', %s'
+                query += 'album_id = %s, '
                 prep_values.append(DatabaseManager.get_album_id(p[2]))
             if p[0] == '--release-year':
-                query += ', release_year'
-                values += ', %s'
+                query += 'release_year = %s, '
                 prep_values.append(p[2])
             if p[0] == '--duration':
-                query += ', duration_sec'
-                values += ', %s'
+                query += 'duration_sec = %s, '
                 prep_values.append(to_s(p[2]))
 
-        query += ') VALUES ' + values + ')'
+        query = query.removesuffix(', ')
+        query += " WHERE ID = %s"
+        prep_values.append(self.__id)
+
         DatabaseManager.execute_prepared(query, tuple(prep_values))
 
-        song_id = self.execute()
-
         for p in self.__modified_params:
-            if p[0] == '--tag':
+            if p[0] == '--atag':
                 DatabaseManager.execute_prepared('INSERT INTO song_tag (song_id, tag_id, value) VALUES (%s, %s, %s)',
-                                                 (song_id, DatabaseManager.get_tag_id(p[2]), p[3]))
+                                                 (self.__id, DatabaseManager.get_tag_id(p[2]), p[3]))
 
-        return song_id
+        # song_id = self.execute()
+
+        # for p in self.__modified_params:
+        #     if p[0] == '--tag':
+        #         DatabaseManager.execute_prepared('INSERT INTO song_tag (song_id, tag_id, value) VALUES (%s, %s, %s)',
+        #                                          (song_id, DatabaseManager.get_tag_id(p[2]), p[3]))
 
     @property
     def command_text(self):
@@ -405,9 +407,13 @@ class Search(Command):
 
                 rows = list(filter(lambda x: x[0] in [song_id[0] for song_id in tag_rows], rows))
 
-        return [{"ID": row[0], "File Name": row[1], "Title": row[2] if row[2] else "Unknown", "Release Year": row[5]
+        return [{"ID": row[0], "File Name": row[1], "Title": row[2] if row[2] else "Unknown",
+                 "Artist": DatabaseManager.get_artist_by_id(row[3]),
+                 "Album": DatabaseManager.get_album_by_id(row[4]),
+                 "Release Year": row[5]
                  if row[5] else "Unknown",
-                 "Duration": to_m_s(row[6]) if row[6] else "Unknown"} for row in rows]
+                 "Duration": to_m_s(row[6]) if row[6] else "Unknown",
+                 "Tags" : DatabaseManager.get_tags_for_song_id(row[0])} for row in rows]
 
     def __init__(self):
         Command.__init__(self)
@@ -542,6 +548,11 @@ if __name__ == '__main__':
         print(Search().decode('Search ').execute())
 
         print(DeleteSong().decode('Delete_song 3').execute())
+
+        print(Search().decode('Search ').execute())
+
+        print(ModifySong().decode('Modify_data 2 --title = Tornado of Souls --album = Rust in Peace '
+                                  '--release-year = 1990 --duration = 5m 30s --atag = channels:stereo').execute())
 
         print(Search().decode('Search ').execute())
     except ValueError as e:
