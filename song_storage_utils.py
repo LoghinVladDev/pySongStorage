@@ -558,15 +558,19 @@ class Play(Command):
         return self
 
     def execute(self):
-        rows = DatabaseManager.execute_prepared('SELECT ID, file_name, duration_sec FROM song WHERE id = %s', (self.__id,))
+        rows = DatabaseManager.execute_prepared('SELECT ID, file_name, song_name, artist_id,'
+                                                'duration_sec FROM song WHERE id = %s', (self.__id,))
         if not rows:
             raise ValueError(f'{self.command_text} : Not a valid ID')
+
+        print(f'Playing {rows[0][2]} by {DatabaseManager.get_artist_by_id(rows[0][3])}. '
+              f'Duration : {to_m_s(rows[0][4]) if rows[0][4] else "Unknown. Playing first 10 seconds"}...')
 
         mixer.init()
         mixer.music.load('./storage/' + rows[0][1])
         mixer.music.play()
 
-        sleep(rows[0][2])
+        sleep(rows[0][4] if rows[0][4] else 10)
 
 
 if __name__ == '__main__':
