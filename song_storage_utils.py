@@ -1,3 +1,10 @@
+import shutil
+from db.database_manager import DatabaseManager
+
+def to_s(seconds_value: str):
+
+
+
 class Command(object):
     __parameters: [tuple] = []
 
@@ -31,6 +38,9 @@ class Command(object):
     def param_types(self):
         return 'Additional'
 
+    def decode(self, string: str):
+        return self
+
     @property
     def usage(self):
         return f"{self.command_text} '{self.default_parameter}' - {self.description}\n" \
@@ -41,8 +51,35 @@ class Command(object):
         self.__file_name = file_name
         return self
 
+    @property
+    def file_name(self):
+        return self.__file_name
+
+    def debug(self):
+        print('COMMAND PROPERTIES : ')
+        print(f'\t{self.command_text}')
+        print(f'\t{self.description}')
+        print(f'\t{self.default_parameter}')
+        print(f'\t{self.result}')
+        print(f'\t{self.param_types}')
+        print('COMMAND VALUES : ')
+        print(f'\t{self.__file_name}')
+
 
 class AddSong(Command):
+    __parameters = [
+        ('--title', 'sets the name metadata value to the value given', None),
+        ('--artist', 'sets the artist metadata value to the value given', None),
+        ('--album', 'sets the album metadata value to the value given', None),
+        ('--release-year', 'sets the release year metadata value to the value given', None),
+        ('--duration', 'sets the duration metadata value to the value given', None),
+        ('--tag', 'adds a tag for the song', None, None)
+    ]
+
+    def __init__(self):
+        Command.__init__(self)
+        self.__file_path = ''
+        self.__modified_params = None
 
     @property
     def command_text(self):
@@ -60,15 +97,101 @@ class AddSong(Command):
     def result(self):
         return 'ID of the song that will be inserted, or existing song ID'
 
-    def execute(self):
-        pass
+    def execute(self) -> int:
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM song WHERE file_name = %s', (self.file_name,))
+
+        if rows:
+            return rows[0][0]
+
+        shutil.copy2(self.__file_path, './storage')
+        query = 'INSERT INTO song (file_name'
+        values = '(%s'
+        prep_values = [self.file_name]
+
+        for p in self.__modified_params:
+            if p[0] == '--title':
+                query += ', song_name'
+                values += ', %s'
+                prep_values.append(p[2])
+            if p[0] == '--artist':
+                query += ', artist_id'
+                values += ', %s'
+                prep_values.append(DatabaseManager.get_artist_id(p[2]))
+            if p[0] == '--album':
+                query += ', album_id'
+                values += ', %s'
+                prep_values.append(DatabaseManager.get_album_id(p[2]))
+            if p[0] == '--release-year':
+                query += ', release_date'
+                values += '%s'
+                prep_values.append(p[2])
+            if p[0] == '--duration':
+                query += ', duration_sec'
+                values += '%s'
+                prep_values.append(to_s(p[2]))
+
+        query += ') VALUES ' + values + ')'
+        DatabaseManager.execute_prepared(query, tuple(prep_values))
+
+    @property
+    def param_names(self):
+        param_string = ''
+
+        for p in AddSong.__parameters:
+            param_string += f'\t\t{p[0]} - {p[1]}\n'
+
+        return param_string
+
+    def decode(self, string: str):
+        parts = string.split(' ', 2)
+
+        if len(parts) < 3:
+            raise ValueError(f'{self.command_text} : not enough parameters')
+
+        if parts[0] != self.command_text:
+            raise ValueError(f'{self.command_text} : command name invalid')
+
+        try:
+            open(parts[1], 'rb').close()
+            self.__file_path = parts[1]
+        except IOError:
+            raise ValueError(f'{self.command_text} : file path invalid')
+
+        self.set_file_name(parts[1].strip().split('/')[-1])
+
+        args = parts[2].split("--")
+        self.__modified_params = []
+        for arg in args:
+            if not arg:
+                continue
+
+            arg_label_value = arg.split('=')
+            label = arg_label_value[0].strip()
+            value = arg_label_value[1].strip()
+
+            for p in self.__parameters:
+                if p[0].endswith(label):
+                    self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
+                                                  else (p[0], p[1], value.split(' ')[0].strip(),
+                                                        value.split(' ')[1].strip()))
+
+        return self
+
+    def debug(self):
+        Command.debug(self)
+        print('ADD SONG : ')
+        print(f'\t{self.__file_path}')
+        for p in self.__modified_params:
+            print(f'\t{p[0]} : {p[2]}, {p[3] if p[0] == "--tag" else ""}')
 
 
 class DeleteSong(Command):
     __parameters = [
-        ('--name', None, 'deletes a song by title'),
-        ('--artist', None, 'deletes a song by artist name'),
-        ('--tag', None, 'deletes a song by tag')
+        ('--name', 'deletes a song by title', None),
+        ('--artist', 'deletes songs by artist name', None),
+        ('--album', 'deletes songs by album', None),
+        ('--release-year', 'deletes songs by release year', None),
+        ('--tag', 'deletes songs by tag value', None, None)
     ]
 
     @property
@@ -88,14 +211,19 @@ class DeleteSong(Command):
         param_string = ''
 
         for p in DeleteSong.__parameters:
-            param_string += f'\t\t{p[0]} - {p[2]}\n'
+            param_string += f'\t\t{p[0]} - {p[1]}\n'
 
         return param_string
 
 
 class ModifySong(Command):
     __parameters = [
-        ('--name', None, 'modifies ')
+        ('--title', 'sets the name metadata value to the value given', None),
+        ('--artist', 'sets the artist metadata value to the value given', None),
+        ('--album', 'sets the album metadata value to the value given', None),
+        ('--release-year', 'sets the release year metadata value to the value given', None),
+        ('--duration', 'sets the duration metadata value to the value given', None),
+        ('--tag', 'adds a tag for the song', None, None)
     ]
 
     @property
@@ -106,8 +234,26 @@ class ModifySong(Command):
     def description(self):
         return 'Modifies a song from the manager storage'
 
+    @property
+    def param_names(self):
+        param_string = ''
+
+        for p in ModifySong.__parameters:
+            param_string += f'\t\t{p[0]} - {p[1]}\n'
+
+        return param_string
+
 
 class Search(Command):
+    __parameters = [
+        ('--title', '[=] searches by title', None),
+        ('--artist', '[=] searches by artist', None),
+        ('--album', '[=] searches by album', None),
+        ('--release-year', '[=, >, <, >=, <=] searches by release year', None),
+        ('--duration', '[=, >, <, >=, <=] searches by duration', None),
+        ('--tag', '[=] searches by tag value', None, None),
+    ]
+
     @property
     def command_text(self):
         return 'Search'
@@ -116,8 +262,26 @@ class Search(Command):
     def description(self):
         return 'Searches for song entries that match given filter'
 
+    @property
+    def param_names(self):
+        param_string = ''
+
+        for p in Search.__parameters:
+            param_string += f'\t\t{p[0]} - {p[1]}\n'
+
+        return param_string
+
 
 class CreateSaveList(Command):
+    __parameters = [
+        ('--title', '[=] searches by title', None),
+        ('--artist', '[=] searches by artist', None),
+        ('--album', '[=] searches by album', None),
+        ('--release-year', '[=, >, <, >=, <=] searches by release year', None),
+        ('--duration', '[=, >, <, >=, <=] searches by duration', None),
+        ('--tag', '[=] searches by tag value', None, None),
+    ]
+
     @property
     def command_text(self):
         return 'Create_save_list'
@@ -125,6 +289,15 @@ class CreateSaveList(Command):
     @property
     def description(self):
         return 'Saves and archives songs that match given filter'
+
+    @property
+    def param_names(self):
+        param_string = ''
+
+        for p in CreateSaveList.__parameters:
+            param_string += f'\t\t{p[0]} - {p[1]}\n'
+
+        return param_string
 
 
 class Play(Command):
@@ -138,9 +311,16 @@ class Play(Command):
 
 
 if __name__ == '__main__':
-    print(AddSong().usage)
-    print(DeleteSong().usage)
-    print(ModifySong().usage)
-    print(Search().usage)
-    print(CreateSaveList().usage)
-    print(Play().usage)
+    # print(AddSong().usage)
+    # print(DeleteSong().usage)
+    # print(ModifySong().usage)
+    # print(Search().usage)
+    # print(CreateSaveList().usage)
+    # print(Play().usage)
+
+    try:
+        AddSong().decode(
+            'Add_song ./temp/Rust_In_Peace_Polaris.mp3 --title = Rust In Peace Polaris --album = Rust In Peace --release-year = 1990'
+            ' --tag = codec flac').execute()
+    except ValueError as e:
+        print(e)

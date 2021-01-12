@@ -35,7 +35,7 @@ class DatabaseManager(object):
         if self.__conn is None:
             raise ConnectionError('Database Connection was not created')
 
-        cursor: mysql.connector.connection.MySQLCursor = self.__conn.cursor()
+        cursor: mysql.connector.connection.MySQLCursor = self.__conn.cursor(prepared=params is not None)
         cursor.execute(statement, params)
 
         if statement.lower().startswith('select') or statement.lower().startswith('update') or \
@@ -48,10 +48,16 @@ class DatabaseManager(object):
 
         self.__conn.commit()
 
-        return result_set if result_set else [tuple]
+        return result_set if result_set else []
 
     @staticmethod
-    def execute(statement: str, params: [] = None) -> [tuple]:
+    def execute(statement: str) -> []:
+        conn = DatabaseManager()
+
+        return conn.execute_statement(statement)
+
+    @staticmethod
+    def execute_prepared(statement: str, params: [] = None) -> [tuple]:
         conn = DatabaseManager()
 
         return conn.execute_statement(statement, params)
@@ -105,3 +111,21 @@ class DatabaseManager(object):
 
         except IOError as PathInvalid:
             print('Path Given is Invalid')
+
+    @staticmethod
+    def get_artist_id(artist_name: str):
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM artist WHERE name = %s', (artist_name, ))
+        if rows:
+            return rows[0][0]
+
+        DatabaseManager.execute_prepared('INSERT INTO artist (name) VALUES (%s)', (artist_name, ))
+        DatabaseManager.get_artist_id(artist_name)
+
+    @staticmethod
+    def get_album_id(album_name: str):
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM album WHERE name = %s', (album_name, ))
+        if rows:
+            return rows[0][0]
+
+        DatabaseManager.execute_prepared('INSERT INTO album (name) VALUES (%s)', (album_name, ))
+        DatabaseManager.get_album_id(album_name)
