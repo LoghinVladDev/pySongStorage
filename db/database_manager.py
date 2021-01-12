@@ -113,18 +113,27 @@ class DatabaseManager(object):
 
     @staticmethod
     def get_artist_id(artist_name: str):
-        rows = DatabaseManager.execute_prepared('SELECT ID FROM artist WHERE name = %s', (artist_name, ))
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM artist WHERE name = %s', (artist_name,))
         if rows:
             return rows[0][0]
 
-        DatabaseManager.execute_prepared('INSERT INTO artist (name) VALUES (%s)', (artist_name, ))
+        DatabaseManager.execute_prepared('INSERT INTO artist (name) VALUES (%s)', (artist_name,))
         return DatabaseManager.get_artist_id(artist_name)
 
     @staticmethod
     def get_album_id(album_name: str):
-        rows = DatabaseManager.execute_prepared('SELECT ID FROM album WHERE name = %s', (album_name, ))
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM album WHERE name = %s', (album_name,))
         if rows:
             return rows[0][0]
 
-        DatabaseManager.execute_prepared('INSERT INTO album (name) VALUES (%s)', (album_name, ))
+        DatabaseManager.execute_prepared('INSERT INTO album (name) VALUES (%s)', (album_name,))
         return DatabaseManager.get_album_id(album_name)
+
+    @staticmethod
+    def get_tag_id(tag_name):
+        rows = DatabaseManager.execute_prepared('SELECT ID FROM tag WHERE tag.name = %s', (tag_name,))
+        if rows:
+            return rows[0][0]
+
+        DatabaseManager.execute_prepared('INSERT INTO tag(name) VALUES (%s)', (tag_name,))
+        return DatabaseManager.get_tag_id(tag_name)

@@ -16,6 +16,7 @@ def to_s(seconds_value: str):
         return int(minutes) * 60 + int(seconds)
     raise ValueError('Invalid Format of Time')
 
+
 class Command(object):
     __parameters: [tuple] = []
 
@@ -142,9 +143,16 @@ class AddSong(Command):
                 prep_values.append(to_s(p[2]))
 
         query += ') VALUES ' + values + ')'
-        print(query)
-        print(prep_values)
         DatabaseManager.execute_prepared(query, tuple(prep_values))
+
+        song_id = self.execute()
+
+        for p in self.__modified_params:
+            if p[0] == '--tag':
+                DatabaseManager.execute_prepared('INSERT INTO song_tag (song_id, tag_id, value) VALUES (%s, %s, %s)',
+                                                 (song_id, DatabaseManager.get_tag_id(p[2]), p[3]))
+
+        return song_id
 
     @property
     def param_names(self):
@@ -185,8 +193,8 @@ class AddSong(Command):
             for p in self.__parameters:
                 if p[0].endswith(label):
                     self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
-                                                  else (p[0], p[1], value.split(' ')[0].strip(),
-                                                        value.split(' ')[1].strip()))
+                                                  else (p[0], p[1], value.split(':')[0].strip(),
+                                                        value.split(':')[1].strip()))
 
         return self
 
@@ -267,6 +275,41 @@ class Search(Command):
         ('--tag', '[=] searches by tag value', None, None),
     ]
 
+    def decode(self, string: str):
+        parts = string.split(' ', 2)
+
+        if len(parts) < 3:
+            raise ValueError(f'{self.command_text} : not enough parameters')
+
+        if parts[0] != self.command_text:
+            raise ValueError(f'{self.command_text} : command name invalid')
+
+        try:
+            open(parts[1], 'rb').close()
+            self.__file_path = parts[1]
+        except IOError:
+            raise ValueError(f'{self.command_text} : file path invalid')
+
+        self.set_file_name(parts[1].strip().split('/')[-1])
+
+        args = parts[2].split("--")
+        self.__modified_params = []
+        for arg in args:
+            if not arg:
+                continue
+
+            arg_label_value = arg.split('=')
+            label = arg_label_value[0].strip()
+            value = arg_label_value[1].strip()
+
+            for p in self.__parameters:
+                if p[0].endswith(label):
+                    self.__modified_params.append((p[0], p[1], value) if p[0] != '--tag'
+                                                  else (p[0], p[1], value.split(':')[0].strip(),
+                                                        value.split(':')[1].strip()))
+
+        return self
+
     @property
     def command_text(self):
         return 'Search'
@@ -324,6 +367,7 @@ class Play(Command):
 
 
 if __name__ == '__main__':
+    DatabaseManager.init_database(force_clear=True)
     # print(AddSong().usage)
     # print(DeleteSong().usage)
     # print(ModifySong().usage)
@@ -333,7 +377,21 @@ if __name__ == '__main__':
 
     try:
         print(AddSong().decode(
-            'Add_song ./temp/Rust_In_Peace_Polaris.mp3 --title = Rust In Peace Polaris --album = Rust In Peace --release-year = 1990'
-            ' --tag = codec flac').execute())
+            'Add_song ./temp/Rust_In_Peace_Polaris.mp3 --title = Rust In Peace Polaris --album = Rust In Peace '
+            '--release-year = 1990 '
+            ' --tag = codec:mp3 --tag = sample rate:44100Hz').execute())
+        print(AddSong().decode(
+            'Add_song ./temp/02-megadeth-dystopia.flac --title = Dystopia --album = Dystopia '
+            '--release-year = 2016 '
+            ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
+        print(AddSong().decode(
+            'Add_song ./temp/10-megadeth-lying_in_state.flac --title = Lying in State --album = Dystopia '
+            '--release-year = 2016 '
+            ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
+        print(AddSong().decode(
+            'Add_song ./temp/01-megadeth-the_threat_is_real.flac --title = The Threat is Real --album = Dystopia '
+            '--release-year = 2016 '
+            ' --tag = codec:flac --tag = sample rate:44100Hz').execute())
     except ValueError as e:
         print(e)
+
