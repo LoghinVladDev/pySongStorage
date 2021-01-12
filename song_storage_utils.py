@@ -2,7 +2,8 @@ import shutil
 from db.database_manager import DatabaseManager
 import os
 import zipfile
-
+from pygame import mixer
+from time import sleep
 
 def to_s(seconds_value: str):
     if seconds_value.isnumeric():
@@ -414,7 +415,7 @@ class Search(Command):
                  "Release Year": row[5]
                  if row[5] else "Unknown",
                  "Duration": to_m_s(row[6]) if row[6] else "Unknown",
-                 "Tags" : DatabaseManager.get_tags_for_song_id(row[0])} for row in rows]
+                 "Tags": DatabaseManager.get_tags_for_song_id(row[0])} for row in rows]
 
     def __init__(self):
         Command.__init__(self)
@@ -535,6 +536,38 @@ class Play(Command):
     def description(self):
         return 'Plays song given'
 
+    @property
+    def default_parameter(self):
+        return 'ID'
+
+    def __init__(self):
+        Command.__init__(self)
+        self.__id = 0
+
+    def decode(self, string: str):
+        parts = string.split(' ', 1)
+
+        if len(parts) < 1:
+            raise ValueError(f'{self.command_text} : not enough parameters')
+
+        if parts[0] != self.command_text:
+            raise ValueError(f'{self.command_text} : command name invalid')
+
+        self.__id = int(parts[1])
+
+        return self
+
+    def execute(self):
+        rows = DatabaseManager.execute_prepared('SELECT ID, file_name, duration_sec FROM song WHERE id = %s', (self.__id,))
+        if not rows:
+            raise ValueError(f'{self.command_text} : Not a valid ID')
+
+        mixer.init()
+        mixer.music.load('./storage/' + rows[0][1])
+        mixer.music.play()
+
+        sleep(rows[0][2])
+
 
 if __name__ == '__main__':
     DatabaseManager.init_database(force_clear=True)
@@ -579,5 +612,7 @@ if __name__ == '__main__':
         print(Search().decode('Search ').execute())
 
         print(CreateSaveList().decode('Create_save_list --album = Rust in Peace').execute())
+
+        print(Play().decode('Play 2').execute())
     except ValueError as e:
         print(e)
